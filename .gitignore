@@ -5,7 +5,6 @@ data/raw/
 
 # Models
 models/*.pkl
-models/*.joblib
 models/*.h5
 
 # Jupyter
