@@ -61,8 +61,24 @@ reports/     - figures and writeups
 - **Outliers**: two flagged — Bengaluru Jan 26 2023 (556 µg/m³, plausibly Republic Day fireworks) and Chennai Jul 5 2019 (291 µg/m³, no clear cause identified). Both kept as-is, will be revisited during feature engineering.
 - **Cross-city correlation**: no negative correlations — all cities share the same monsoon-driven seasonal cycle. Mumbai–Hyderabad most correlated (0.71), Chennai least correlated with others (0.16–0.22) due to its unique northeast monsoon pattern.
 
+## Baseline Results (Notebook 02)
+
+Walk-forward validation: expanding window, 365-day minimum training, 30-day forecast horizon, 30-day step size → 39 folds per city.
+
+Persistence forecast ("repeat last value") beats seasonal naive ("same day last year") for every city. These are the minimum bars real models must beat:
+
+| City      | Persistence MAE | Persistence RMSE |
+|-----------|----------------|------------------|
+| Delhi     | 45.07          | 55.01            |
+| Mumbai    | 17.56          | 21.02            |
+| Chennai   | 12.81          | 15.86            |
+| Hyderabad | 15.54          | 18.22            |
+| Bengaluru | 11.52          | 15.62            |
+
 ## Status
 
 ✅ Notebook 01 — EDA complete
 
-🚧 In progress — Notebook 02 (walk-forward validation harness + naive baseline)
+✅ Notebook 02 — Walk-forward validation harness + naive baselines complete
+
+🚧 In progress — Notebook 03 (SARIMA)
