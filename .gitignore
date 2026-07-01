@@ -1,6 +1,5 @@
 # Data
 data/raw/
-*.csv
 *.csv.gz
 *.zip
 
