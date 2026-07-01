@@ -26,10 +26,10 @@ Stations were selected by checking non-null PM2.5 coverage within the 2019–202
 
 1. **EDA** — seasonality, missingness, distribution analysis per city
 2. **Walk-forward validation harness** — built before any model, plus a naive baseline
-3. **Classical model** — SARIMA / Prophet
-4. **Feature engineering** — lags, rolling stats, calendar effects (leakage-aware)
+3. **Classical models** — SARIMA (Delhi proof of concept) / Prophet (full walk-forward CV)
+4. **Feature engineering** — lags, rolling stats, calendar effects, holiday flags, outlier flags (leakage-aware)
 5. **ML model** — LightGBM
-6. **Comparison & error analysis** across all three approaches
+6. **Comparison & error analysis** across all approaches
 
 ## Setup
 
@@ -52,13 +52,21 @@ models/      - saved trained model artifacts
 reports/     - figures and writeups
 ```
 
+## Key Methodological Decisions
+
+- **Log-transform (`log1p`) applied before all modeling and all engineered features** — chosen after EDA found right-skewed distributions and multiplicative seasonality in Delhi. Rolling stats in particular are only meaningful computed post-log, since `log(mean of x)` ≠ `mean of log(x))` on raw, spike-heavy PM2.5 series.
+- **Linear interpolation** used to fill missing values before splitting into folds.
+- **Expanding-window walk-forward CV** (365-day minimum train, 30-day horizon, 30-day step, 39 folds/city) used as the evaluation harness for every model, for consistency across baselines, Prophet, and LightGBM.
+- **SARIMA run as a single 80/20 split on Delhi only**, not full walk-forward CV — `m=365` on daily data made full CV computationally impractical (~10–30 hrs estimated). Acknowledged limitation; Prophet is the primary classical benchmark.
+- **Outlier days kept in the data, not removed** — instead flagged as a binary feature for the ML model to use as it sees fit.
+
 ## EDA Findings (Notebook 01)
 
 - **Missingness**: scattered/random across all 5 cities post-2019, no structural sensor outages. Pre-2019 data had 22–47% missingness, confirming the window choice.
 - **Seasonality**: strong yearly cycle confirmed across all cities — winter spikes (Oct–Feb), monsoon dips (Jun–Sep). Delhi most extreme (peaks 400–600 µg/m³), Bengaluru flattest (10–50 µg/m³ typical).
-- **Decomposition**: multiplicative model fits better than additive for Delhi (seasonal swings scale with trend level). Other cities ambiguous. Decision: log-transform series before SARIMA across all cities.
+- **Decomposition**: multiplicative model fits better than additive for Delhi (seasonal swings scale with trend level). Other cities ambiguous. Decision: log-transform series across all cities.
 - **Distribution**: all cities heavily right-skewed — further confirms log-transform is appropriate.
-- **Outliers**: two flagged — Bengaluru Jan 26 2023 (556 µg/m³, plausibly Republic Day fireworks) and Chennai Jul 5 2019 (291 µg/m³, no clear cause identified). Both kept as-is, will be revisited during feature engineering.
+- **Outliers**: two flagged — Bengaluru Jan 26 2023 (556 µg/m³, plausibly Republic Day fireworks) and Chennai Jul 5 2019 (291 µg/m³, no clear cause identified). Both kept as-is; formally captured as a z-score-based outlier flag in feature engineering (notebook 04), which independently confirmed both days plus several more per city.
 - **Cross-city correlation**: no negative correlations — all cities share the same monsoon-driven seasonal cycle. Mumbai–Hyderabad most correlated (0.71), Chennai least correlated with others (0.16–0.22) due to its unique northeast monsoon pattern.
 
 ## Baseline Results (Notebook 02)
@@ -75,10 +83,44 @@ Persistence forecast ("repeat last value") beats seasonal naive ("same day last 
 | Hyderabad | 15.54          | 18.22            |
 | Bengaluru | 11.52          | 15.62            |
 
+## SARIMA / Prophet Results (Notebook 03)
+
+**ADF test**: all 5 cities stationary on raw series → `d=0` for all cities.
+
+**SARIMA**: `SARIMA(1,0,1)(1,1,1,365)`, Delhi-only, single 80/20 train/test split (full walk-forward CV computationally infeasible at `m=365`). Result pending.
+
+**Prophet**: `yearly_seasonality=True`, weekly/daily seasonality off, `seasonality_mode='multiplicative'`, log-transformed input, holiday regressors (Diwali, Republic Day, Holi, New Year), full walk-forward CV using the same harness as notebook 02.
+
+| City      | MAE   | RMSE  | Beats persistence? |
+|-----------|-------|-------|---------------------|
+| Delhi     | 37.38 | 46.51 | ✅ −17%              |
+| Mumbai    | 17.54 | 21.29 | ✅ barely             |
+| Chennai   | 15.40 | 20.19 | ❌ worse              |
+| Hyderabad | 12.71 | 15.11 | ✅ −18%              |
+| Bengaluru | 11.08 | 14.80 | ✅ −4%               |
+
+## Feature Engineering (Notebook 04)
+
+Built entirely on `pm25_log` for consistency with the log-transform decision above. Leakage-checked throughout — all rolling stats computed on a series shifted by one day before rolling, so no feature ever has access to the current day's own value.
+
+- **Lags**: 1, 2, 3, 7, 14, 30, 365 days
+- **Rolling stats**: mean & std (7, 14, 30-day windows), min & max (7, 30-day windows)
+- **Calendar**: day of week, month, day of year, is-weekend, plus sin/cos cyclical encodings of day-of-year and day-of-week (so year-end/year-start and Sunday/Monday are recognized as adjacent rather than numerically far apart)
+- **Holiday flags**: Diwali, Republic Day, Holi, New Year, ±1 day buffer around each date
+- **Outlier flags**: z-score (|z| > 3) computed per city on `pm25_log`, confirmed to catch both known EDA outliers (Bengaluru Jan 26 2023, Chennai Jul 5 2019) plus additional flagged days — Chennai (8), Hyderabad (7), Bengaluru (4), Delhi (0), Mumbai (0). Delhi/Mumbai showing zero flagged days is expected: z-score measures deviation relative to each city's *own* typical spread, and Delhi's large seasonal swings are themselves the norm, so even 400+ µg/m³ days don't register as statistically rare for Delhi specifically.
+
+> Known limitation: outlier z-scores are computed on each city's full series mean/std rather than per-fold expanding-window statistics — a minor leakage accepted for a binary flag feature, consistent with the SARIMA single-split simplification above.
+
 ## Status
 
 ✅ Notebook 01 — EDA complete
 
 ✅ Notebook 02 — Walk-forward validation harness + naive baselines complete
 
-🚧 In progress — Notebook 03 (SARIMA)
+🚧 Notebook 03 — Prophet complete, SARIMA (Delhi) running
+
+✅ Notebook 04 — Feature engineering complete
+
+⬜ Notebook 05 — LightGBM
+
+⬜ Notebook 06 — Model comparison
