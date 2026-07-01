@@ -52,6 +52,17 @@ models/      - saved trained model artifacts
 reports/     - figures and writeups
 ```
 
+## EDA Findings (Notebook 01)
+
+- **Missingness**: scattered/random across all 5 cities post-2019, no structural sensor outages. Pre-2019 data had 22–47% missingness, confirming the window choice.
+- **Seasonality**: strong yearly cycle confirmed across all cities — winter spikes (Oct–Feb), monsoon dips (Jun–Sep). Delhi most extreme (peaks 400–600 µg/m³), Bengaluru flattest (10–50 µg/m³ typical).
+- **Decomposition**: multiplicative model fits better than additive for Delhi (seasonal swings scale with trend level). Other cities ambiguous. Decision: log-transform series before SARIMA across all cities.
+- **Distribution**: all cities heavily right-skewed — further confirms log-transform is appropriate.
+- **Outliers**: two flagged — Bengaluru Jan 26 2023 (556 µg/m³, plausibly Republic Day fireworks) and Chennai Jul 5 2019 (291 µg/m³, no clear cause identified). Both kept as-is, will be revisited during feature engineering.
+- **Cross-city correlation**: no negative correlations — all cities share the same monsoon-driven seasonal cycle. Mumbai–Hyderabad most correlated (0.71), Chennai least correlated with others (0.16–0.22) due to its unique northeast monsoon pattern.
+
 ## Status
 
-🚧 In progress — currently on EDA (notebook 01).
+✅ Notebook 01 — EDA complete
+
+🚧 In progress — Notebook 02 (walk-forward validation harness + naive baseline)
