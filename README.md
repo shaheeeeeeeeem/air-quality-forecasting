@@ -48,7 +48,6 @@ kaggle datasets download -d abhisheksjha/time-series-air-quality-data-of-india-2
 
 ```
 notebooks/   - sequential analysis notebooks (01 through 07)
-src/         - reusable pipeline code (data loading, validation, features, evaluation)
 models/      - saved trained model artifacts
 reports/     - figures and writeups
 ```
